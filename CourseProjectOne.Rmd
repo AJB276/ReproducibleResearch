@@ -1,6 +1,6 @@
 ---
-title: "CourseProjectOne"
-author: "AJB"
+title: "Course Project One"
+author: "Adam Blanch"
 date: "4/23/2020"
 output: html_document
 ---
@@ -9,3 +9,74 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
+## Data
+
+Download the data set: [Activity monitoring data](https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2Factivity.zip)
+
+The following R code will download and extract the data files into the current working directory, and create the data set *activity* for analysis.
+
+```{r prepare dataset}
+url <- "https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2Factivity.zip"
+zipFile <- "repdata_data_activity.zip"
+dataFile <- "activity.csv"
+if(!file.exists(zipFile))
+{
+  download.file(url,destfile="repdata_data_activity.zip",method="curl")
+}
+if(!file.exists(dataFile))
+{
+  unzip(zipFile)
+}
+activity <- read.csv(dataFile)
+```
+## Objective of Analysis
+To answer a set of questions relating to the activity monitoring data.
+
+### Questions
+
+1. What is mean total number of steps taken per day?
+```{r Summary}
+summary(activity)
+```
+
+2. Calculate the total number of steps taken per day
+
+Histogram of the total number of steps taken each day
+```{r Histogram steps}
+```
+
+3. Calculate and report the mean and median of the total number of steps taken per day
+``` {r Mean and Median steps per day}
+```
+
+4. What is the average daily activity pattern?
+Make a time series plot (i.e. $\color{red}{\text{type = "l"}}$) of the 5-minute interval (x-axis) and the average number of steps taken, averaged across all days (y-axis)
+``` {r Times series plot average daily activity pattern}
+```
+
+5. Which 5-minute interval, on average across all the days in the dataset, contains the maximum number of steps?
+Imputing missing values
+Note that there are a number of days/intervals where there are missing values (coded as $\color{red}{\text{NA}}$). The presence of missing days may introduce bias into some calculations or summaries of the data.
+```{r Five Minute Interval across all days}
+```
+
+6. Calculate and report the total number of missing values in the dataset (i.e. the total number of rows with $\color{red}{\text{NA}}$s)
+Devise a strategy for filling in all of the missing values in the dataset. The strategy does not need to be sophisticated. For example, you could use the mean/median for that day, or the mean for that 5-minute interval, etc.
+```{r Missing data}
+```
+
+7. Create a new dataset that is equal to the original dataset but with the missing data filled in.
+Make a histogram of the total number of steps taken each day and Calculate and report the mean and median total number of steps taken per day.
+```{r Histogram missing data filled in}
+```
+
+* Do these values differ from the estimates from the first part of the assignment?
+* What is the impact of imputing missing data on the estimates of the total daily number of steps?
+
+8. Are there differences in activity patterns between weekdays and weekends?
+For this part the $\color{red}{\text{weekdays()}}$ function may be of some help here. Use the dataset with the filled-in missing values for this part.
+```{r Difference in activity patterns}
+```
+
+Create a new factor variable in the dataset with two levels – “weekday” and “weekend” indicating whether a given date is a weekday or weekend day.
+Make a panel plot containing a time series plot (i.e. $\color{red}{\text{type = "l"}}$) of the 5-minute interval (x-axis) and the average number of steps taken, averaged across all weekday days or weekend days (y-axis). See the README file in the GitHub repository to see an example of what this plot should look like using simulated data.

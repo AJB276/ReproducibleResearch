@@ -1,5 +1,5 @@
 ---
-title: "Course Project One"
+title: "Reproducible Research: Course Project One"
 author: "Adam Blanch"
 date: "4/23/2020"
 output: html_document
@@ -10,13 +10,15 @@ knitr::opts_chunk$set(echo = TRUE)
 knitr::opts_chunk$set(cache=TRUE)
 ```
 The R code requires these libraries.
-```{r libraries}
+```{r libraries, results = FALSE}
 library(dplyr)
 library(ggplot2)
 library(gridExtra)
 ```
 
 ## Data
+
+This assignment makes use of data from a personal activity monitoring device. This device collects data at 5 minute intervals through out the day. The data consists of two months of data from an anonymous individual collected during the months of October and November, 2012 and include the number of steps taken in 5 minute intervals each day.
 
 Download the data set: [Activity monitoring data](https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2Factivity.zip)
 
@@ -39,7 +41,7 @@ activity <- read.csv(dataFile)
 ## Objective of Analysis
 To answer a set of questions relating to the activity monitoring data.
 
-*Answers will be in italics.*
+***Answers will be in italics.***
 
 ### Questions
 
@@ -47,35 +49,39 @@ To answer a set of questions relating to the activity monitoring data.
 
 * **What are the total number of steps taken per day?**
 
+The folliwing code creates and calls a functiont to summarise the number of steps taken per day.  The function *get_step_count* will be used to replicate these steps with modified data sets.
+
 ```{r Daily Step Count}
 get_step_count <- function(activity)
 {
   step_count <- activity %>%
     group_by(date) %>%
-    summarise(total=sum(steps,na.rm=TRUE),nas=sum(is.na(steps)))
+    summarise(total_steps=sum(steps,na.rm=TRUE),nas=sum(is.na(steps)))
   step_count$date <- as.Date(step_count$date)
   step_count
 }
 step_count <- get_step_count(activity)
 summary(step_count)
 ```
-*From the summary above you can see the mean is `r prettyNum(mean(step_count$total),big.mark=",")` steps per day and the median is `r prettyNum(median(step_count$total),big.mark=",")` steps per day.*
-*The maximum number of steps is `r prettyNum(max(step_count$total),big.mark=",")`.*
+***From the summary above you can see the mean is `r prettyNum(mean(step_count$total_steps),big.mark=",")` steps per day and the median is `r prettyNum(median(step_count$total_steps),big.mark=",")` steps per day.*
+*The maximum number of steps is `r prettyNum(max(step_count$total_steps),big.mark=",")`.***
 
 NB: `r sum(step_count$nas == 288)` of `r nrow(step_count)` days contain no activity data. `r sum((step_count$nas > 0) && (step_count$nas <288))` days contain missing data.
 
-For this part we will ignore the missing values in the dataset.
+For this part, questions 1 to 3, we will ignore the missing values in the dataset.
 
 The time series plot below shows the number of steps taken per day and their variation.
 
 ### Time series: Steps per day
 
+The R code function *time_series* below generates a time series of the number of steps taken in a day. The mean steps taken during the period are shown in blue, and the median in green.
+
 ```{r time series}
 time_series <- function(step_count)
 {
-  mean_steps_per_day <- mean(step_count$total)
-  median_steps_per_day <- median(step_count$total)
-  ggplot(step_count,aes(date,total)) + geom_line() + geom_point() +
+  mean_steps_per_day <- mean(step_count$total_steps)
+  median_steps_per_day <- median(step_count$total_steps)
+  ggplot(step_count,aes(date,total_steps)) + geom_line() + geom_point() +
     geom_hline(yintercept = mean_steps_per_day, col="blue") +
     geom_hline(yintercept = median_steps_per_day, col = "green")
 }
@@ -84,12 +90,14 @@ time_series(step_count)
 
 ### Histogram of steps per day
 
+The R code function *step_hist* below generates a histogram of the number of steps taken in a day. The mean steps taken during the period are shown in blue, and the median in green.
+
 ```{r histogram}
 step_hist <- function(sc)
 {
-  mean_steps_per_day <- mean(sc$total)
-  median_steps_per_day <- median(sc$total)
-  ggplot(sc,aes(total)) +
+  mean_steps_per_day <- mean(sc$total_steps)
+  median_steps_per_day <- median(sc$total_steps)
+  ggplot(sc,aes(total_steps)) +
     geom_histogram(bins = 20) +
     geom_vline(xintercept = mean_steps_per_day, col="blue") +
     geom_vline(xintercept = median_steps_per_day, col = "green")
@@ -99,7 +107,11 @@ step_hist(step_count)
 
 
 **2. What is the average daily activity pattern?**
+
 Make a time series plot (i.e. $\color{red}{\text{type = "l"}}$) of the 5-minute interval (x-axis) and the average number of steps taken, averaged across all days (y-axis)
+
+The R code below generates a time series across the entire period.  It converts the interval and date into a POSIXct TimeDate value so we have a meaniful x axis. The format of interval is HHMM.
+
 ``` {r Times series plot activity}
 for (i in 1:length(activity$interval))
 {
@@ -117,13 +129,15 @@ for (i in 1:length(activity$interval))
   seconds <- seconds + hours * 60 * 60
   activity$dateTime[i] <- as.POSIXct(activity$date[i]) + seconds
 }
-ggplot(activity,aes(as.POSIXct(dateTime,origin="1970/01/01"),steps)) + geom_line(na.rm=TRUE)
+ggplot(activity,aes(as.POSIXct(dateTime,origin="1970/01/01"),steps)) + geom_line(na.rm=TRUE) + labs(x="date")
 ```
+
+The r code following generates a time series plot of the mean steps for each 5 minute interval in a day over the entire data period `r min(as.Date(activity$date))` to `r max(as.Date(activity$date))`.
 
 ```{r 5 minute interval summary}
 if(exists("interval_step_count"))
    rm(interval_step_count)
-interval_step_count <- activity %>% group_by(interval) %>% summarise(total=sum(steps,na.rm=TRUE),mean_steps=mean(steps,na.rm=TRUE))
+interval_step_count <- activity %>% group_by(interval) %>% summarise(total_steps=sum(steps,na.rm=TRUE),mean_steps=mean(steps,na.rm=TRUE))
 #interval is in the format HHMM without leading zeros, there are 288 5 minute intervals in the day
 interval_step_count$five_minute_interval <- vector("numeric",length=288)
 for(i in 1:length(interval_step_count$interval))
@@ -135,8 +149,11 @@ g <- ggplot(interval_step_count,aes(five_minute_interval/60,mean_steps)) + geom_
 ```
 
 **3. Which 5-minute interval, on average across all the days in the dataset, contains the maximum number of steps?**
+
+The r code following plot the Time series above, with the addition of a red dot at the maximum number of mean steps during the day and identifies that interval.
+
 ```{r Five Minute Interval across all days}
-max_interval <- interval_step_count[which.max(interval_step_count$total),]
+max_interval <- interval_step_count[which.max(interval_step_count$total_steps),]
 g + geom_point(x=max_interval$five_minute_interval/60,y=max_interval$mean_steps,col="red")
 time_str <- function(five_minute_interval)
 {
@@ -146,7 +163,7 @@ time_str <- function(five_minute_interval)
 }
 ```
 
-*The maximum interval shown by the red dot starts at `r time_str(max_interval$five_minute_interval)` and has a mean of `r prettyNum(max_interval$mean_steps,big.mark=",",digits=1,nsmall=1)` steps taken during that 5 minute period over the entire period.*
+***The maximum interval shown by the red dot starts at `r time_str(max_interval$five_minute_interval)` and has a mean of `r prettyNum(max_interval$mean_steps,big.mark=",",digits=1,nsmall=1)` steps taken during that 5 minute period over the entire period.***
 
 ## Imputing missing values
 
@@ -154,11 +171,11 @@ Note that there are a number of days/intervals where there are missing values (c
 
 **4. Calculate and report the total number of missing values in the dataset**
 
-*For questions 1 to 3 we found `r sum(step_count$nas == 288)` of `r nrow(step_count)` days contain no activity data. `r sum((step_count$nas > 0) && (step_count$nas <288))` days contain missing data. So we choose to just ignore the missing days. The total missing data is `r prettyNum(sum(!complete.cases(activity)),big.mark=",")` observations.* 
+***For questions 1 to 3 we found `r sum(step_count$nas == 288)` of `r nrow(step_count)` days contain no activity data. `r sum((step_count$nas > 0) && (step_count$nas <288))` days contain missing data. So we choose to just ignore the missing days. The total missing data is `r prettyNum(sum(!complete.cases(activity)),big.mark=",")` observations or `r round(sum(!complete.cases(activity)) / nrow(activity) * 100,1)`% of the total data.*** 
 
-If we use only complete cases i.e. data that does not include any NAs.
+Below we use only complete cases i.e. data that does not include any NAs.
 
-This plot shows the cases ignoring the missing data on the left and with only complete caeses on the right.  Observations, are that the histogram is more meaning with complete cases, and the mean and median are now almost identical.
+The plot below shows the cases ignoring the missing data on the left and with only complete cases on the right.  Observations, are that the histogram is more meaning with complete cases, and the mean and median are now almost identical which is why only the green line for median is visible at this scale.
 
 ```{r ignore missing values}
 newActivity <- activity[complete.cases(activity),]
@@ -172,6 +189,8 @@ grid.arrange(p1, p3, p2, p4, ncol=2)
 
 Further analysis to devise a strategy for filling in all of the missing values in the dataset.
 
+The r code following generates a histogram of the missing data grouped by the day of week.  That is be used to visually determine if a significant portion of data is missing.
+
 ```{r Missing data}
 #The strategy does not need to be sophisticated. For example, you could
 #use the mean/median for that day, or the mean for that 5-minute interval
@@ -184,8 +203,10 @@ ggplot(activity,aes(dayofweek)) + geom_histogram(stat="count",aes(fill=complete)
 
 ### Daily Patterns
 
+The r code following generates a time series of mean steps per 5 minute interval grouped by the day of week.  That is being used to visually determine if there are any trends that may be significant to missing data.
+
 ```{r daily patterns}
-daily_step_count <- activity %>% group_by(interval,dayofweek) %>% summarise(total=sum(steps,na.rm=TRUE),mean_steps=mean(steps,na.rm=TRUE),median_steps=median(steps,na.rm=TRUE))
+daily_step_count <- activity %>% group_by(interval,dayofweek) %>% summarise(total_steps=sum(steps,na.rm=TRUE),mean_steps=mean(steps,na.rm=TRUE),median_steps=median(steps,na.rm=TRUE))
 ggplot(daily_step_count,aes(interval,mean_steps)) + geom_line(aes(col=dayofweek)) + facet_grid(rows = vars(dayofweek))
 ```
 
@@ -214,43 +235,45 @@ p6 <- step_hist(complete_step_count)
 grid.arrange(p1, p3, p5, p2, p4, p6, ncol=3)
 ```
 
-*The mean is now `r prettyNum(mean(complete_step_count$total),big.mark=",",nsmall=2)` steps per day and the median is `r prettyNum(median(complete_step_count$total),big.mark=",")` steps per day.*
-*The maximum number of steps is still `r prettyNum(max(complete_step_count$total),big.mark=",")`.*
+***The mean is now `r prettyNum(mean(complete_step_count$total_steps),big.mark=",",nsmall=2)` steps per day and the median is `r prettyNum(median(complete_step_count$total_steps),big.mark=",")` steps per day.***
+***The maximum number of steps is still `r prettyNum(max(complete_step_count$total_steps),big.mark=",")`.***
 
 * **Do these values differ from the estimates from the first part of the assignment?**
 
+The r code following creates a summary data frame of the observations in questions 1 to 3 above.
+
 ```{r compare results}
-comparison <- data.frame(case=c("Ignore","Complete","Imputed"),mean=c(mean(step_count$total),mean(new_step_count$total),mean(complete_step_count$total)),median=c(median(step_count$total),median(new_step_count$total),median(complete_step_count$total)))
+comparison <- data.frame(case=c("Ignore","Complete","Imputed"),mean=c(mean(step_count$total_steps),mean(new_step_count$total_steps),mean(complete_step_count$total_steps)),median=c(median(step_count$total_steps),median(new_step_count$total_steps),median(complete_step_count$total_steps)))
 print(comparison)
 ```
-*Yes, there is a change in mean and median values for all three methods used.*
+***Yes, there is a change in mean and median values for all three methods used.***
 
-* **What is the impact of imputing missing data on the estimates of the total daily number of steps?**
+**6. What is the impact of imputing missing data on the estimates of the total daily number of steps?**
 
-* *The first method ignore, where the missing data is ignored in calculating the mean and medians and plotting the histogram of steps per day, resulted in a mean lower than the median values because of the number of zero steps introduced into the data.*
-* *The second method complete, where only the complete data is used, or the missing data is discarded, the median and mean both increased, and converged to a common estimate.*
-* *The third method imputed, where the missing data is calculated using the mean value of steps taken in each interval for the particularly day of the week that corresponded to the missing data. This showed a further slight increase in both mean and miedian. Resulting from more frequenct occurences over the period around the mean values.*
+* ***The first method ignore, where the missing data is ignored in calculating the mean and medians and plotting the histogram of steps per day, resulted in a mean lower than the median values because of the number of zero steps introduced into the data.***
+
+* ***The second method complete, where only the complete data is used, or the missing data is discarded, the median and mean both increased, and converged to a common estimate.***
+
+* ***The third method imputed, where the missing data is calculated using the mean value of steps taken in each interval for the particularly day of the week that corresponded to the missing data. This showed a further slight increase in both mean and miedian. Resulting from more frequenct occurences over the period around the mean values.***
 
 
-**6. Are there differences in activity patterns between weekdays and weekends?**
+**7. Are there differences in activity patterns between weekdays and weekends?**
 
-*When exploring the daily time series by day of week, we saw a difference in activity across all the days of the week, with some patterns visible.  Monday through Wednesday were similar, Thursday through to Saturday were simlar, and Sunday was a bit unique. Refer to [Daily Patterns](#Daily) in question 4 above.*
+***When exploring the daily time series by day of week, we saw a difference in activity across all the days of the week, with some patterns visible.  Monday through Wednesday were similar, Thursday through to Saturday were simlar, and Sunday was a bit unique. Refer to [Daily Patterns](#Daily) in question 4 above.***
 
-Below is the code to seperate the weekdays and weekends.
+Below is the R code to seperate the weekdays and weekends.
 
 ```{r Difference in weekend activity patterns}
-daily_step_count$weekend <- daily_step_count$dayofweek %in% c("Saturday","Sunday")
+daily_step_count$weekend <- factor(daily_step_count$dayofweek %in% c("Saturday","Sunday"),levels=c(FALSE,TRUE),c("Weekday","Weekend"))
 ggplot(daily_step_count,aes(interval,mean_steps)) + geom_line(aes(col=dayofweek)) + facet_grid(rows = vars(weekend))
 ```
 
-The code below separates into the three groups of days that looked visually similar, as a comp[arison to the weekend data above.
+The R code below separates into the three groups of days that looked visually similar, as a comp[arison to the weekend data above.
 
 ```{r Difference in groups}
-daily_step_count$group <- NULL
 daily_step_count$group[daily_step_count$dayofweek %in% c("Monday","Tuesday","Wednesday")] <- "Mon_Wed"
 daily_step_count$group[daily_step_count$dayofweek %in% c("Thursday","Friday","Saturday")] <- "Thu_Sat"
 daily_step_count$group[daily_step_count$dayofweek %in% c("Sunday")] <- "Sun"
 daily_step_count$group <- factor(daily_step_count$group,levels=c("Mon_Wed","Thu_Sat","Sun"))
 ggplot(daily_step_count,aes(interval,mean_steps)) + geom_line(aes(col=dayofweek)) + facet_grid(rows = vars(group))
 ```
-See the README file in the GitHub repository to see an example of what this plot should look like using simulated data.

@@ -11,9 +11,32 @@ output:
 The R code requires these libraries.
 
 ```r
-library(dplyr)
 library(ggplot2)
 library(gridExtra)
+library(dplyr)
+```
+
+```
+## 
+## Attaching package: 'dplyr'
+```
+
+```
+## The following object is masked from 'package:gridExtra':
+## 
+##     combine
+```
+
+```
+## The following objects are masked from 'package:stats':
+## 
+##     filter, lag
+```
+
+```
+## The following objects are masked from 'package:base':
+## 
+##     intersect, setdiff, setequal, union
 ```
 
 ## Data
@@ -94,9 +117,7 @@ time_series <- function(step_count)
 {
   mean_steps_per_day <- mean(step_count$total_steps)
   median_steps_per_day <- median(step_count$total_steps)
-  ggplot(step_count,aes(date,total_steps)) + geom_line() + geom_point() +
-    geom_hline(yintercept = mean_steps_per_day, col="blue") +
-    geom_hline(yintercept = median_steps_per_day, col = "green")
+  ggplot(step_count,aes(date,total_steps)) + geom_line() + geom_point() + geom_hline(yintercept = mean_steps_per_day, col="blue") + geom_hline(yintercept = median_steps_per_day, col = "green")
 }
 time_series(step_count)
 ```
@@ -113,10 +134,7 @@ step_hist <- function(sc)
 {
   mean_steps_per_day <- mean(sc$total_steps)
   median_steps_per_day <- median(sc$total_steps)
-  ggplot(sc,aes(total_steps)) +
-    geom_histogram(bins = 20) +
-    geom_vline(xintercept = mean_steps_per_day, col="blue") +
-    geom_vline(xintercept = median_steps_per_day, col = "green")
+  ggplot(sc,aes(total_steps)) + geom_histogram(bins = 20) + geom_vline(xintercept = mean_steps_per_day, col="blue") + geom_vline(xintercept = median_steps_per_day, col = "green")
 }
 step_hist(step_count)
 ```
@@ -203,7 +221,9 @@ Note that there are a number of days/intervals where there are missing values (c
 
 Below we use only complete cases i.e. data that does not include any NAs.
 
-The plot below shows the cases ignoring the missing data on the left and with only complete cases on the right.  Observations, are that the histogram is more meaning with complete cases, and the mean and median are now almost identical which is why only the green line for median is visible at this scale.
+The plot below shows the cases ignoring the missing data on the left and with only complete cases on the right.
+
+***Observations, are that the histogram is more meaning with complete cases, and the mean and median are now almost identical which is why only the green line for median is visible at this scale.***
 
 
 ```r

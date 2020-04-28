@@ -2,9 +2,9 @@
 title: "Reproducible Research: Course Project One"
 author: "Adam Blanch"
 date: "4/23/2020"
-output: 
-  html_document: 
-    keep_md: yes
+output:
+  github_document:
+    html_document
 ---
 
 This has been published at [Rpubs](https://rpubs.com/AJB276/606015) to view the html without needing to fork the repositorary or knitr the r markdown file.

@@ -7,6 +7,8 @@ output:
     keep_md: yes
 ---
 
+This has been published at [Rpubs](https://rpubs.com/AJB276/606015) to view the html without needing to fork the repositorary or knitr the r markdown file.
+
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
@@ -140,7 +142,7 @@ for(i in 1:length(interval_step_count$interval))
 {
   interval_step_count$five_minute_interval[i] <- (i-1) * 5
 }
-g <- ggplot(interval_step_count,aes(five_minute_interval/60,mean_steps)) + geom_line() + scale_x_continuous(name="Five minute Itervals", breaks=c(0:24))
+g <- ggplot(interval_step_count,aes(five_minute_interval/60,mean_steps)) + geom_line() + scale_x_continuous(name="Five minute Itervals (hour)", breaks=c(0:24))
 #print(g)
 ```
 

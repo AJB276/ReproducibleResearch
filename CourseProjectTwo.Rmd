@@ -1,0 +1,135 @@
+---
+title: "Severe weather events" 
+subtitle: "Their impact on public health and the economy."
+author: Adam Blanch
+date: 28th April 2020
+output:
+  github_document:
+    html_document
+---
+
+```{r setup, include=FALSE}
+library(dplyr)
+library(stringdist)
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(cache = TRUE)
+```
+
+## Synopsis
+
+The basic goal of this report is to explore the NOAA Storm Database and determine:
+
+1. Across the United States, which types of events are most harmful with respect to population health?
+2. Across the United States, which types of events have the greatest economic consequences?
+
+## Introduction
+
+Storms and other severe weather events can cause both public health and economic problems for communities and municipalities. Many severe events can result in fatalities, injuries, and property damage, and preventing such outcomes to the extent possible is a key concern.
+
+This project involves exploring the U.S. National Oceanic and Atmospheric Administration's (NOAA) storm database. This database tracks characteristics of major storms and weather events in the United States, including when and where they occur, as well as estimates of any fatalities, injuries, and property damage.
+
+
+## Data Processing
+
+The data for this assignment come in the form of a comma-separated-value file compressed via the bzip2 algorithm to reduce its size. You can download the file from the course web site:
+
+* [Storm Data](https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2) [47Mb]
+
+There is also some documentation of the database available. Here you will find how some of the variables are constructed/defined.
+
+* National Weather [Service Storm Data Documentation](https://d396qusza40orc.cloudfront.net/repdata%2Fpeer2_doc%2Fpd01016005curr.pdf)
+* National Climatic Data Center Storm Events [FAQ](https://d396qusza40orc.cloudfront.net/repdata%2Fpeer2_doc%2FNCDC%20Storm%20Events-FAQ%20Page.pdf)
+
+The events in the database start in the year 1950 and end in November 2011. In the earlier years of the database there are generally fewer events recorded, most likely due to a lack of good records. More recent years should be considered more complete.
+
+<details><summary>Data Processing Code (Expand to view code)</summary>
+<p>
+```{r DataProcessing}
+url <- "https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2"
+zipFile <- "repdata_data_StormData.bzip2"
+dataFile <- "stormdata.csv"
+#this flag is TRUE if you want to store the csv on the local directory
+#             FALSE if you want to extract the csv from the zip each time
+storeCSV <- TRUE
+#Download the data
+if(!file.exists(zipFile))
+{
+  download.file(url,destfile=zipFile,method="curl")
+}
+#Extract the csv from the zip file
+if(!file.exists(dataFile) && storeCSV)
+{
+  stormdata <- read.csv(zipFile)
+  if(storeCSV)
+    write.csv(stormdat,file = dataFile)
+} else {
+  stormdata <- read.csv(dataFile)
+}
+```
+
+### Tidy Data
+
+The National Climatic Data Center Storm Events lists 48 different event types but exploring the data fromm the csv file has `r length(levels(stormdata$EVTYPE))` different event types.  This includes typos and abbreviations.  So the first step is to group the data by the 48 different event types.
+
+```{r Summary}
+evtypes <- c("Astronomical High Tide","Astronomical Low Tide","Avalanche","Blizzard","Coastal Flood","Cold/Wind Chill","Debris Flow","Dense Fog","Dense Smoke","Drought","Dust Devil","Dust Storm","Excessive Heat","Extreme Cold/Wind Chill","Flash Flood","Flood","Freezing Fog","Frost/Freeze","Funnel Cloud","Hail","Heat","Heavy Rain","Heavy Snow","High Surf","High Wind","Hurricane/Typhoon","Ice Storm","Lakeshore Flood","Lake-Effect Snow","Lightning","Marine Hail","Marine High Wind","Marine Strong Wind","Marine Thunderstorm Wind","Rip Current","Seiche","Sleet","Storm Tide","Strong Wind","Thunderstorm Wind","Tornado","Tropical Depression","Tropical Storm","Tsunami","Volcanic Ash","Waterspout","Wildfire","Winter Storm","Winter Weather")
+
+impactVals <- c("FATALITIES","INJURIES","PROPDMG","CROPDMG")
+impactFields <- c(impactVals,"PROPDMGEXP","CROPDMGEXP")
+
+#We are only interested in stormdata that has an impact on public health and the economy
+stormdata$EVENTHARM <- with(stormdata,(FATALITIES+INJURIES+PROPDMG+CROPDMG)>0)
+stormdata <- stormdata[stormdata$EVENTHARM,]
+
+stormdata$EVTYPENEW <- toupper(stormdata$EVTYPE)
+# Remove leading spaces
+stormdata$EVTYPENEW <- gsub("^ +","",stormdata$EVTYPENEW)
+stormdata$EVTYPENEW <- gsub("  +"," ",stormdata$EVTYPENEW)
+# Change abbrev TSTM to Thunderstorm
+stormdata$EVTYPENEW <- gsub("TSTM","THUNDERSTORM",stormdata$EVTYPENEW)
+# Debris Flow is not used a term in the database but was listed are an event type
+# the following slides are debris flow events
+stormdata$EVTYPENEW <- gsub("(LAND|ROCK|MUD|LAND |ROCK |MUD )SLIDE(|S)","DEBRIS FLOW",stormdata$EVTYPENEW)
+
+stormdata$EVTYPENEW <- gsub("COASTAL SURGE","COASTAL FLOOD",stormdata$EVTYPENEW)
+stormdata$EVTYPENEW <- gsub("SURGE/TIDE|SURGE","TIDE",stormdata$EVTYPENEW)
+
+# Remove plurals so the types match
+stormdata$EVTYPENEW <- gsub("FLOODING|FLOODIN|FLD|FLDG","FLOOD",stormdata$EVTYPENEW)
+stormdata$EVTYPENEW <- gsub("WINDS","WIND",stormdata$EVTYPENEW)
+stormdata$EVTYPENEW <- gsub("STORMS","STORM", stormdata$EVTYPENEW)
+stormdata$EVTYPENEW <- gsub("CURRENTS","CURRENT",stormdata$EVTYPENEW)
+stormdata$EVTYPENEW <- gsub(" FIRES|FIRES| FIRE","FIRE",stormdata$EVTYPENEW)
+stormdata$EVTYPENEW <- gsub("COASTAL/TIDAL|CSTL","COASTAL",stormdata$EVTYPENEW)
+
+# Wildfire is the only type of fire in the 48 events
+stormdata$EVTYPENEW <- gsub("WILD/FOREST|FOREST|BRUSH|GRASS","WILD",stormdata$EVTYPENEW)
+
+stormdata[grep("^URBAN|^SMALL STREAM|^RIVER",stormdata$EVTYPENEW),]$EVTYPENEW <- "FLOOD"
+
+multicategory <- grepl("/",stormdata$EVTYPENEW)&!grepl("COLD/WIND|HURRICANE/TYPHOON|FROST/FREEZE",stormdata$EVTYPENEW)
+multicat_list <- strsplit(stormdata[multicategory,]$EVTYPENEW,"/")
+source("define_multi_events.R")
+multicat_str <- define_multi_events(multicat_list)
+stormdata[multicategory,][!is.na(multicat_str),]$EVTYPENEW <- multicat_str[!is.na(multicat_str)]
+
+stormdata[stormdata$EVTYPENEW == "EXTREME COLD",]$EVTYPENEW <- "EXTREME COLD/WIND CHILL"
+
+stormdata$EVTYPENEW <- factor(stormdata$EVTYPENEW)
+
+eventsummary <- stormdata %>% group_by(EVTYPENEW) %>% summarise(total_fatalities = sum(FATALITIES), mean_fatalities = mean(FATALITIES), count = n())
+
+eventsummary$EVTYPEMATCH <- evtypes[amatch(as.character(eventsummary$EVTYPENEW),toupper(evtypes),maxDist=100)]
+
+write.csv(eventsummary,"evtypes.csv")
+
+
+eventsummary[order(eventsummary$count,decreasing = TRUE),]
+eventsummary[order(eventsummary$mean_fatalities,decreasing = TRUE),]
+```
+</p>
+
+## Results
+
+``` {r Results}
+```

@@ -47,8 +47,10 @@ For a expense comparison the [CPI data](https://www.federalreserve.gov/datadownl
 ### Assumptions
 
 Processing the data has a few assumtpions:
-1. The PROPDMGEXP and CROPDMGEXP numeric values represent powers of 10. i.e "3"would be equivalent to "k" or 1000 times.
-2. Some of the large events cross multiple states and counties, the same damge figure is duplicated. For the purpose of this analysis I have allowed the values to be duplicated but further analysis may be required to determine the validity and impact on study results.
+
+1. The PROPDMGEXP and CROPDMGEXP that contain numeric values represent powers of 10. i.e "3" would be equivalent to "k" or 1000 times.
+
+2. Some of the large events cross multiple states and counties, the same damage figure is duplicated. For the purpose of this analysis I have allowed the values to be duplicated but further analysis may be required to determine the validity and impact on study results.
 
 ### Download and Read Data
 
@@ -86,24 +88,14 @@ baseCPI <- c(CPI=cpiData[cpiData$Time.Period=="2011-12","IP.B50001.S"],date="201
 
 ### Tidy Data
 
-The National Climatic Data Center Storm Events lists 48 different event types but exploring the data fromm the csv file has `r length(levels(stormdata$EVTYPE))` different event types.  This includes typos, abbreviations and alternate names.  So the first step is to group the data by the 48 different event types using the [Storm Data Documentation](https://d396qusza40orc.cloudfront.net/repdata%2Fpeer2_doc%2Fpd01016005curr.pdf) to make valid reclassifcations.  The code for this is included in [tidy_stormdata.R](https://github.com/AJB276/ReproducibleResearch)
+The National Climatic Data Center Storm Events lists 48 different event types but exploring the data fromm the csv file has `r length(levels(stormdata$EVTYPE))` different event types.  This includes typos, abbreviations and alternate names.  So the first step is to group the data by the 48 different event types using the [Storm Data Documentation](https://d396qusza40orc.cloudfront.net/repdata%2Fpeer2_doc%2Fpd01016005curr.pdf) to make valid reclassifcations.  The code for this is included in [tidy_stormdata.R](http://github.com/AJB276/ReproducibleResearch)
 
 ``` {r TidyData}
+# Code to tidy data into 48 different events is not included in report
 source("tidy_stormdata.R")
 ```
-### Summary
 
-``` {r Summary}
-sum(!complete.cases(stormdata$EVTYPENEW))
-stormdata <- stormdata[complete.cases(stormdata$EVTYPENEW),]
-stormdata$EVTYPENEW <- factor(stormdata$EVTYPENEW,exclude = NA)
-stormdata$BGN_DATE <- as.POSIXct(stormdata$BGN_DATE,format="%m/%d/%Y %H:%M:%OS")
-
-eventsummary <- stormdata %>% group_by(EVTYPENEW) %>% summarise(total_fatalities = sum(FATALITIES), mean_fatalities = mean(FATALITIES), count = n())
-
-propsummary <- stormdata %>% group_by(EVTYPENEW,PROPDMGEXP) %>% summarise(total_propdmg = sum(PROPDMG), mean_propdmg = mean(PROPDMG), count = n())
-propsummary[order(propsummary$count,decreasing = TRUE),]
-
+``` {r CalculateDamage}
 damageValues <- function(dmg,dateStr,dmgStr,dmgEXPStr)
 {
   dmg$year <- year(dmg[,dateStr])
@@ -120,19 +112,105 @@ damageValues <- function(dmg,dateStr,dmgStr,dmgEXPStr)
   dmg$EQUIVTOTDMG <- dmg$TOTDMG*(cpiBase/dmg$CPI)
   dmg
 }
+```
+
+### Summary
+
+``` {r Summary}
+#sum(!complete.cases(stormdata$EVTYPENEW))
+stormdata <- stormdata[complete.cases(stormdata$EVTYPENEW),]
+stormdata$EVTYPENEW <- factor(stormdata$EVTYPENEW)
+stormdata$BGN_DATE <- as.POSIXct(stormdata$BGN_DATE,format="%m/%d/%Y %H:%M:%OS")
+
+eventsummary <- stormdata %>% group_by(EVTYPENEW) %>% summarise(total_fatalities = sum(FATALITIES), mean_fatalities = mean(FATALITIES), total_injuries = sum(INJURIES), mean_injuries = mean(INJURIES), count = n())
 
 propDMG <- stormdata[stormdata$PROPDMG > 0,c("EVTYPENEW","BGN_DATE","PROPDMG","PROPDMGEXP")]
 propDMG <- damageValues(propDMG,"BGN_DATE","PROPDMG","PROPDMGEXP")
+propDMGsummary <- propDMG %>% group_by(EVTYPENEW) %>% summarise(total_damage = sum(TOTDMG), total_equivdamage = sum(EQUIVTOTDMG), count = n())
 
 cropDMG <- stormdata[stormdata$CROPDMG > 0,c("EVTYPENEW","BGN_DATE","CROPDMG","CROPDMGEXP")]
 cropDMG <- damageValues(cropDMG,"BGN_DATE","CROPDMG","CROPDMGEXP")
+cropDMGsummary <- cropDMG %>% group_by(EVTYPENEW) %>% summarise(total_damage = sum(TOTDMG), total_equivdamage = sum(EQUIVTOTDMG), count = n())
 ```
 
 ## Results
 
-``` {r Results}
+### Across the United States, which types of events are most harmful with respect to population health?
+
+The types of events that are most harmful with respect to population health have been plotted below:
+
+``` {r HealthResults}
+# events with highest fatalities
+fatalitiesAll <- arrange(eventsummary,desc(total_fatalities),desc(total_injuries))
+# events with highest injuries
+injuriesAll <- arrange(eventsummary,desc(total_injuries),desc(total_fatalities))
+par(mfrow = c(1, 2), mar = c(15, 4, 4, 2), mgp = c(3, 1, 0), cex = 0.7)
+fatalities <- fatalitiesAll[1:10,]
+injuries <- injuriesAll[1:10,]
+barplot(fatalities$total_fatalities, las = 3, names.arg = fatalities$EVTYPENEW, main = "Events with Highest Fatalities", ylab = "Number of fatalities", col = "red")
+barplot(injuries$total_injuries, las = 3, names.arg = injuries$EVTYPENEW, main = "Events with Highest Injuries", ylab = "Number of injuries", col = "yellow")
 ```
+
+**Figure 1: Events with Highest Fatalities and Injuries**
+
+### Across the United States, which types of events have the greatest economic consequences?
+
+The types of events thathave the greatest economic consequences have been plotted below:
+
+``` {r EconomicResults}
+# events with highest property damage
+propDMGorder <- arrange(propDMGsummary,desc(total_equivdamage))
+# events with highest crop damage
+cropDMGorder <- arrange(cropDMGsummary,desc(total_equivdamage))
+par(mfrow = c(1, 2), mar = c(15, 4, 4, 2), mgp = c(3, 1, 0), cex = 0.7)
+propDMGtop <- propDMGorder[1:10,]
+cropDMGtop <- cropDMGorder[1:10,]
+barplot(propDMGtop$total_equivdamage/(10^9), las = 3, names.arg = propDMGtop$EVTYPENEW, main = "Events with Highest Property Damage", ylab = "Amount of Damage ($ billions in Dec 2011 $ terms)", col = "red")
+barplot(cropDMGtop$total_equivdamage/(10^9), las = 3, names.arg = cropDMGtop$EVTYPENEW, main = "Events with Highest Crop Damage", ylab = "Amount of Damage ($ billions in Dec 2011 $ terms)", col = "yellow")
+```
+
+**Figure 2: Events with Highest Property and crop Damage in Billions**
+NB: figures have been asjusted to December 2011 dollars using the total Ip.50001.S index
+
+### Trends on major public health and economy
+
+The plots below show the annual fatalities for Tornados (black line) and Heat (red line; both Excessive Heat and Heat added together), and the annual property + crop damage for tornados (black line) and flood (red line).
+
+``` {r AnnualTrend,fig.width=9,fig.height=3}
+tornado_and_heat <- stormdata[grep("TORNADO|HEAT",stormdata$EVTYPENEW),]
+tornado_and_heat$tornado <- ifelse(tornado_and_heat$EVTYPE=="TORNADO",TRUE,FALSE)
+fatality_year <- data.frame(tornado=tornado_and_heat$tornado,year=year(tornado_and_heat$BGN_DATE),fatalities = tornado_and_heat$FATALITIES)
+fatality_year <- fatality_year %>% group_by(tornado,year) %>% summarise(tot = sum(fatalities), count = n())
+ymax <- max(fatality_year$tot)
+propDMGyear <- propDMG %>% group_by(EVTYPENEW,year) %>% summarise(total_damage = sum(TOTDMG), total_equivdamage = sum(EQUIVTOTDMG), count = n())
+cropDMGyear <- cropDMG %>% group_by(EVTYPENEW,year) %>% summarise(total_damage = sum(TOTDMG), total_equivdamage = sum(EQUIVTOTDMG), count = n())
+# events with highest property damage
+propDMGflood <- propDMGyear[propDMGyear$EVTYPENEW=="FLOOD",]
+propDMGtornado <- propDMGyear[propDMGyear$EVTYPENEW=="TORNADO",]
+cropDMGflood <- cropDMGyear[cropDMGyear$EVTYPENEW=="FLOOD",]
+cropDMGtornado <- cropDMGyear[cropDMGyear$EVTYPENEW=="TORNADO",]
+totDMGflood <- data.frame(year=propDMGflood$year,tot=propDMGflood$total_equivdamage + cropDMGflood$total_equivdamage)
+totDMGtornado <- data.frame(year=propDMGtornado$year,tot=propDMGtornado$total_equivdamage)
+totDMGtornado$tot[(62-18):62] <- totDMGtornado$tot[(62-18):62] + cropDMGtornado$total_equivdamage
+ymaxDMG <- max(c(totDMGflood$tot,totDMGtornado$tot))
+# events with highest injuriess
+par(mfrow = c(1, 2), mar = c(4, 4, 4, 4), mgp = c(3, 1, 0), cex = 0.8)
+plot(x=fatality_year[fatality_year$tornado==TRUE,]$year,y=fatality_year[fatality_year$tornado==TRUE,]$tot, type = "l", main = "Fatalities per year", xlab = "year", ylab = "Fatalities", col = 1, ylim = c(0,ymax))
+points(x=fatality_year[fatality_year$tornado==FALSE,]$year,y=fatality_year[fatality_year$tornado==FALSE,]$tot, type = "l", col = 2)
+legend(x="topleft",legend=c("TORNADO","HEAT"),lty=1,col = c(1,2))
+plot(x=totDMGtornado$year,y=totDMGtornado$tot/(10^9), type = "l", main = "Property and Crop Damage per year", xlab ="year", ylab = "Amount of Damage ($ billions in Dec 2011 $ terms)", col = 1, ylim = c(0,ymaxDMG/(10^9)))
+points(x=totDMGflood$year,y=totDMGflood$tot/(10^9), type = "l", col = 2)
+legend(x="topleft",legend=c("TORNADO","FLOOD"),lty=1,col = c(1,2))
+```
+
+**Figure 3: Fatalities and Damage per year for the two most severe events of each**
 
 ## Conclusion
 
-Areas that arose from analysis of the data for further investigation or clarifcation was the detail on the property and crop damage.  An example of an event or events that have a large impact potential quality of the data is April 11, 1965 Palm Sunday Tornados.
+The graphs show that in terms of public health Tornados are significantly more impactful than most other sources.  So it suggests further research into how to reduce the health risk, such as warning systems, safety standards and shelters.  The effect of Heat on public health is also significant.
+
+Flood had a major economic impact on both property and crops. So it suggests further research into how to reduce the economic impact of flood.  Further inquiry could be into the location of flooding and how damage could be further mitigated.  Possible new building standards or regulations in flood prone areas.  Flash flood and flood also feature in the top health risks.
+
+Tornado, Flood (including Flash flood) and Excessive Heat (including Heat) appear to be the events that most impact on public health and the economy.
+
+The annual totals do not show any trends that suggest any investment made to date has impacted the public health risk or economic impact from severe weather events in the two most significant contributors. Heat and Flood both have some outliers that could warrant further investigation.

@@ -10,7 +10,7 @@ output:
 
 ```{r setup, include=FALSE}
 library(dplyr)
-library(stringdist)
+library(lubridate)
 knitr::opts_chunk$set(echo = TRUE)
 knitr::opts_chunk$set(cache = TRUE)
 ```
@@ -37,13 +37,21 @@ The data for this assignment come in the form of a comma-separated-value file co
 
 There is also some documentation of the database available. Here you will find how some of the variables are constructed/defined.
 
-* National Weather [Service Storm Data Documentation](https://d396qusza40orc.cloudfront.net/repdata%2Fpeer2_doc%2Fpd01016005curr.pdf)
+* National Weather Service [Storm Data Documentation](https://d396qusza40orc.cloudfront.net/repdata%2Fpeer2_doc%2Fpd01016005curr.pdf)
 * National Climatic Data Center Storm Events [FAQ](https://d396qusza40orc.cloudfront.net/repdata%2Fpeer2_doc%2FNCDC%20Storm%20Events-FAQ%20Page.pdf)
 
 The events in the database start in the year 1950 and end in November 2011. In the earlier years of the database there are generally fewer events recorded, most likely due to a lack of good records. More recent years should be considered more complete.
 
-<details><summary>Data Processing Code (Expand to view code)</summary>
-<p>
+For a expense comparison the [CPI data](https://www.federalreserve.gov/datadownload/Output.aspx?rel=G17&series=865924caea53dd4e8edcf7cb134f80db&lastobs=&from=01/01/1950&to=12/31/2011&filetype=csv&label=include&layout=seriescolumn) for the period Jan 1950 to Dec 2011 is available to download.
+
+### Assumptions
+
+Processing the data has a few assumtpions:
+1. The PROPDMGEXP and CROPDMGEXP numeric values represent powers of 10. i.e "3"would be equivalent to "k" or 1000 times.
+2. Some of the large events cross multiple states and counties, the same damge figure is duplicated. For the purpose of this analysis I have allowed the values to be duplicated but further analysis may be required to determine the validity and impact on study results.
+
+### Download and Read Data
+
 ```{r DataProcessing}
 url <- "https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2"
 zipFile <- "repdata_data_StormData.bzip2"
@@ -65,71 +73,66 @@ if(!file.exists(dataFile) && storeCSV)
 } else {
   stormdata <- read.csv(dataFile)
 }
+
+# only going to access some of the information so to save memory, just select those
+# columns. NB: STATE and REMARKS are not used but help provide detail to check validity
+# of assumtions
+stormdata <- stormdata[,c("BGN_DATE","STATE","EVTYPE","FATALITIES","INJURIES","PROPDMG","PROPDMGEXP","CROPDMG","CROPDMGEXP","REMARKS")]
+
+download.file("https://www.federalreserve.gov/datadownload/Output.aspx?rel=G17&series=865924caea53dd4e8edcf7cb134f80db&lastobs=&from=01/01/1950&to=12/31/2011&filetype=csv&label=include&layout=seriescolumn",destfile="cpi.csv",method="curl")
+cpiData <- read.csv("cpi.csv",header=TRUE,skip=5)
+baseCPI <- c(CPI=cpiData[cpiData$Time.Period=="2011-12","IP.B50001.S"],date="2011-12")
 ```
 
 ### Tidy Data
 
-The National Climatic Data Center Storm Events lists 48 different event types but exploring the data fromm the csv file has `r length(levels(stormdata$EVTYPE))` different event types.  This includes typos and abbreviations.  So the first step is to group the data by the 48 different event types.
+The National Climatic Data Center Storm Events lists 48 different event types but exploring the data fromm the csv file has `r length(levels(stormdata$EVTYPE))` different event types.  This includes typos, abbreviations and alternate names.  So the first step is to group the data by the 48 different event types using the [Storm Data Documentation](https://d396qusza40orc.cloudfront.net/repdata%2Fpeer2_doc%2Fpd01016005curr.pdf) to make valid reclassifcations.  The code for this is included in [tidy_stormdata.R](https://github.com/AJB276/ReproducibleResearch)
 
-```{r Summary}
-evtypes <- c("Astronomical High Tide","Astronomical Low Tide","Avalanche","Blizzard","Coastal Flood","Cold/Wind Chill","Debris Flow","Dense Fog","Dense Smoke","Drought","Dust Devil","Dust Storm","Excessive Heat","Extreme Cold/Wind Chill","Flash Flood","Flood","Freezing Fog","Frost/Freeze","Funnel Cloud","Hail","Heat","Heavy Rain","Heavy Snow","High Surf","High Wind","Hurricane/Typhoon","Ice Storm","Lakeshore Flood","Lake-Effect Snow","Lightning","Marine Hail","Marine High Wind","Marine Strong Wind","Marine Thunderstorm Wind","Rip Current","Seiche","Sleet","Storm Tide","Strong Wind","Thunderstorm Wind","Tornado","Tropical Depression","Tropical Storm","Tsunami","Volcanic Ash","Waterspout","Wildfire","Winter Storm","Winter Weather")
+``` {r TidyData}
+source("tidy_stormdata.R")
+```
+### Summary
 
-impactVals <- c("FATALITIES","INJURIES","PROPDMG","CROPDMG")
-impactFields <- c(impactVals,"PROPDMGEXP","CROPDMGEXP")
-
-#We are only interested in stormdata that has an impact on public health and the economy
-stormdata$EVENTHARM <- with(stormdata,(FATALITIES+INJURIES+PROPDMG+CROPDMG)>0)
-stormdata <- stormdata[stormdata$EVENTHARM,]
-
-stormdata$EVTYPENEW <- toupper(stormdata$EVTYPE)
-# Remove leading spaces
-stormdata$EVTYPENEW <- gsub("^ +","",stormdata$EVTYPENEW)
-stormdata$EVTYPENEW <- gsub("  +"," ",stormdata$EVTYPENEW)
-# Change abbrev TSTM to Thunderstorm
-stormdata$EVTYPENEW <- gsub("TSTM","THUNDERSTORM",stormdata$EVTYPENEW)
-# Debris Flow is not used a term in the database but was listed are an event type
-# the following slides are debris flow events
-stormdata$EVTYPENEW <- gsub("(LAND|ROCK|MUD|LAND |ROCK |MUD )SLIDE(|S)","DEBRIS FLOW",stormdata$EVTYPENEW)
-
-stormdata$EVTYPENEW <- gsub("COASTAL SURGE","COASTAL FLOOD",stormdata$EVTYPENEW)
-stormdata$EVTYPENEW <- gsub("SURGE/TIDE|SURGE","TIDE",stormdata$EVTYPENEW)
-
-# Remove plurals so the types match
-stormdata$EVTYPENEW <- gsub("FLOODING|FLOODIN|FLD|FLDG","FLOOD",stormdata$EVTYPENEW)
-stormdata$EVTYPENEW <- gsub("WINDS","WIND",stormdata$EVTYPENEW)
-stormdata$EVTYPENEW <- gsub("STORMS","STORM", stormdata$EVTYPENEW)
-stormdata$EVTYPENEW <- gsub("CURRENTS","CURRENT",stormdata$EVTYPENEW)
-stormdata$EVTYPENEW <- gsub(" FIRES|FIRES| FIRE","FIRE",stormdata$EVTYPENEW)
-stormdata$EVTYPENEW <- gsub("COASTAL/TIDAL|CSTL","COASTAL",stormdata$EVTYPENEW)
-
-# Wildfire is the only type of fire in the 48 events
-stormdata$EVTYPENEW <- gsub("WILD/FOREST|FOREST|BRUSH|GRASS","WILD",stormdata$EVTYPENEW)
-
-stormdata[grep("^URBAN|^SMALL STREAM|^RIVER",stormdata$EVTYPENEW),]$EVTYPENEW <- "FLOOD"
-
-multicategory <- grepl("/",stormdata$EVTYPENEW)&!grepl("COLD/WIND|HURRICANE/TYPHOON|FROST/FREEZE",stormdata$EVTYPENEW)
-multicat_list <- strsplit(stormdata[multicategory,]$EVTYPENEW,"/")
-source("define_multi_events.R")
-multicat_str <- define_multi_events(multicat_list)
-stormdata[multicategory,][!is.na(multicat_str),]$EVTYPENEW <- multicat_str[!is.na(multicat_str)]
-
-stormdata[stormdata$EVTYPENEW == "EXTREME COLD",]$EVTYPENEW <- "EXTREME COLD/WIND CHILL"
-
-stormdata$EVTYPENEW <- factor(stormdata$EVTYPENEW)
+``` {r Summary}
+sum(!complete.cases(stormdata$EVTYPENEW))
+stormdata <- stormdata[complete.cases(stormdata$EVTYPENEW),]
+stormdata$EVTYPENEW <- factor(stormdata$EVTYPENEW,exclude = NA)
+stormdata$BGN_DATE <- as.POSIXct(stormdata$BGN_DATE,format="%m/%d/%Y %H:%M:%OS")
 
 eventsummary <- stormdata %>% group_by(EVTYPENEW) %>% summarise(total_fatalities = sum(FATALITIES), mean_fatalities = mean(FATALITIES), count = n())
 
-eventsummary$EVTYPEMATCH <- evtypes[amatch(as.character(eventsummary$EVTYPENEW),toupper(evtypes),maxDist=100)]
+propsummary <- stormdata %>% group_by(EVTYPENEW,PROPDMGEXP) %>% summarise(total_propdmg = sum(PROPDMG), mean_propdmg = mean(PROPDMG), count = n())
+propsummary[order(propsummary$count,decreasing = TRUE),]
 
-write.csv(eventsummary,"evtypes.csv")
+damageValues <- function(dmg,dateStr,dmgStr,dmgEXPStr)
+{
+  dmg$year <- year(dmg[,dateStr])
+  dmg$month <- month(dmg[,dateStr])
+  dmg$CPI <- cpiData[(dmg$year-1950)*12+dmg$month,"IP.B50001.S"]
+  suppressWarnings(dmg$power <- as.numeric(as.character(dmg[,dmgEXPStr])))
+  dmg[is.na(dmg$power),]$power <- 0
+  if(nrow(dmg[toupper(dmg[,dmgEXPStr])=="H",])) dmg[toupper(dmg[,dmgEXPStr])=="H",]$power <- 2
+  dmg[toupper(dmg[,dmgEXPStr])=="K",]$power <- 3
+  dmg[toupper(dmg[,dmgEXPStr])=="M",]$power <- 6
+  dmg[toupper(dmg[,dmgEXPStr])=="B",]$power <- 9
+  dmg$TOTDMG <- dmg[,dmgStr] * 10^dmg$power
+  cpiBase <- as.numeric(baseCPI["CPI"])
+  dmg$EQUIVTOTDMG <- dmg$TOTDMG*(cpiBase/dmg$CPI)
+  dmg
+}
 
+propDMG <- stormdata[stormdata$PROPDMG > 0,c("EVTYPENEW","BGN_DATE","PROPDMG","PROPDMGEXP")]
+propDMG <- damageValues(propDMG,"BGN_DATE","PROPDMG","PROPDMGEXP")
 
-eventsummary[order(eventsummary$count,decreasing = TRUE),]
-eventsummary[order(eventsummary$mean_fatalities,decreasing = TRUE),]
+cropDMG <- stormdata[stormdata$CROPDMG > 0,c("EVTYPENEW","BGN_DATE","CROPDMG","CROPDMGEXP")]
+cropDMG <- damageValues(cropDMG,"BGN_DATE","CROPDMG","CROPDMGEXP")
 ```
-</p>
 
 ## Results
 
 ``` {r Results}
 ```
+
+## Conclusion
+
+Areas that arose from analysis of the data for further investigation or clarifcation was the detail on the property and crop damage.  An example of an event or events that have a large impact potential quality of the data is April 11, 1965 Palm Sunday Tornados.
